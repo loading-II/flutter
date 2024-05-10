@@ -5849,6 +5849,7 @@ class InheritedElement extends ProxyElement {
 /// fast. It is also used by the test framework and [debugDumpApp].
 abstract class RenderObjectElement extends Element {
   /// Creates an element that uses the given widget as its configuration.
+  /// 创建一个 element 使用提供的 widget 作为配置
   RenderObjectElement(RenderObjectWidget super.widget);
 
   /// The underlying [RenderObject] for this element.
@@ -5929,6 +5930,11 @@ abstract class RenderObjectElement extends Element {
       _debugDoingBuild = true;
       return true;
     }());
+    //3、通过widget树（即RenderObjectToWidgetAdapter）调用createRenderObject方法传入Element实例自己获取RenderObject渲染树。
+    // RenderObjectToWidgetAdapter.createRenderObject(this)
+    // 返回的是RenderObjectToWidgetAdapter的container成员，也就是上面分析的RenderView渲染树根节点。
+    // 所以说：element 会有widget 和 renderObject，
+    // 在这里创建了 renderObject的根节点 RenderObject
     _renderObject = (widget as RenderObjectWidget).createRenderObject(this);
     assert(!_renderObject!.debugDisposed!);
     assert(() {

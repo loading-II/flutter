@@ -256,7 +256,7 @@ abstract mixin class WidgetsBindingObserver {
   void didChangeAccessibilityFeatures() { }
 }
 
-/// The glue between the widgets layer and the Flutter engine.
+/// The glue between the widgets layer and the Flutter engine.[小部件层和Flutter引擎之间的粘合剂。]
 mixin WidgetsBinding on BindingBase, ServicesBinding, SchedulerBinding, GestureBinding, RendererBinding, SemanticsBinding {
   @override
   void initInstances() {
@@ -271,8 +271,13 @@ mixin WidgetsBinding on BindingBase, ServicesBinding, SchedulerBinding, GestureB
     // Initialization of [_buildOwner] has to be done after
     // [super.initInstances] is called, as it requires [ServicesBinding] to
     // properly setup the [defaultBinaryMessenger] instance.
+
+    //创建一个管理Widgets的类对象
+    //BuildOwner类用来跟踪哪些 Widget 需要重建，并处理用于 Widget 树的其他任务，例如管理不活跃的 Widget 等，调试模式触发重建等。
     _buildOwner = BuildOwner();
+    //回调方法赋值，当第一个可构建元素被标记为脏时调用。[setState流程中，可见被赋值回调]
     buildOwner!.onBuildScheduled = _handleBuildScheduled;
+    //回调方法赋值，当本地配置变化或者AccessibilityFeatures变化时调用。
     platformDispatcher.onLocaleChanged = handleLocaleChanged;
     SystemChannels.navigation.setMethodCallHandler(_handleNavigationInvocation);
     assert(() {
@@ -952,6 +957,7 @@ mixin WidgetsBinding on BindingBase, ServicesBinding, SchedulerBinding, GestureB
   /// The `rootWidget` widget provided to this method must not already be
   /// wrapped in a [View].
   Widget wrapWithDefaultView(Widget rootWidget) {
+    //这里 View 继承自 StatelessWidget，实际返回的还是个Widget
     return View(
       view: platformDispatcher.implicitView!,
       child: rootWidget,
@@ -964,6 +970,9 @@ mixin WidgetsBinding on BindingBase, ServicesBinding, SchedulerBinding, GestureB
   /// [attachRootWidget] if you want to build the widget tree synchronously.
   @protected
   void scheduleAttachRootWidget(Widget rootWidget) {
+    //本质是异步执行了attachRootWidget(rootWidget)方法，
+    // 这个方法完成了 Flutter Widget 到 Element 到 RenderObject 的整个关联过程
+    //简单的异步快速执行，将attachRootWidget异步化
     Timer.run(() {
       attachRootWidget(rootWidget);
     });
@@ -979,14 +988,24 @@ mixin WidgetsBinding on BindingBase, ServicesBinding, SchedulerBinding, GestureB
   ///  * [RenderObjectToWidgetAdapter.attachToRenderTree], which inflates a
   ///    widget and attaches it to the render tree.
   void attachRootWidget(Widget rootWidget) {
+    //1、是不是 ’初始启动帧‘，即看 rootElement 是否有赋值，赋值时机为步骤2
     final bool isBootstrapFrame = rootElement == null;
-    _readyToProduceFrames = true;
-    _rootElement = RenderObjectToWidgetAdapter<RenderBox>(
-      container: renderView,
+    _readyToProduceFrames = true;//准备去生产帧布局
+    //2、桥梁创建RenderObject、Element、Widget关系树，_renderViewElement值为attachToRenderTree方法返回值
+    // 重点跟进 RenderObjectToWidgetAdapter
+    // RenderObjectToWidgetAdapter 才是 widget 树的根节点
+    _rootElement = RenderObjectToWidgetAdapter<RenderBox>(//只是构造器，具体看下面的函数：attachToRenderTree
+      //3、RenderObjectWithChildMixin类型，继承自RenderObject，RenderObject继承自AbstractNode。
+      //来自RendererBinding的_pipelineOwner.rootNode，_pipelineOwner来自其初始化initInstances方法实例化的PipelineOwner对象。
+      //一个Flutter App全局只有一个PipelineOwner实例。
+      container: renderView,// RenderView get renderView => _pipelineOwner.rootNode! as RenderView;
       debugShortDescription: '[root]',
+      //4、我们平时写的dart Widget app
       child: rootWidget,
     ).attachToRenderTree(buildOwner!, rootElement as RenderObjectToWidgetElement<RenderBox>?);
     if (isBootstrapFrame) {
+      //6、首帧主动更新一下，匹配条件的情况下内部本质是调用SchedulerBinding的scheduleFrame()方法。
+      //进而本质调用了window.scheduleFrame()方法。
       SchedulerBinding.instance.ensureVisualUpdate();
     }
   }
@@ -1076,11 +1095,13 @@ mixin WidgetsBinding on BindingBase, ServicesBinding, SchedulerBinding, GestureB
 ///  * [WidgetsBinding.handleBeginFrame], which pumps the widget pipeline to
 ///    ensure the widget, element, and render trees are all built.
 void runApp(Widget app) {
+  //TODO: 确保初始化，获取了全局单例 WidgetsBinding
   final WidgetsBinding binding = WidgetsFlutterBinding.ensureInitialized();
   assert(binding.debugCheckZone('runApp'));
-  binding
-    ..scheduleAttachRootWidget(binding.wrapWithDefaultView(app))
-    ..scheduleWarmUpFrame();
+  //TODO: 绑定根节点创建核心三棵树
+  binding.scheduleAttachRootWidget(binding.wrapWithDefaultView(app));
+  //TODO: 绘制热身帧--调用后会立即执行一次绘制（不用等待 VSYNC 信号到来）。
+  binding.scheduleWarmUpFrame();
 }
 
 String _debugDumpAppString() {
@@ -1108,30 +1129,36 @@ void debugDumpApp() {
 /// [RenderObject] that the container expects as its child.
 ///
 /// Used by [runApp] to bootstrap applications.
+/// RenderObjectToWidgetAdapter-->RenderObjectWidget-->Widget()
 class RenderObjectToWidgetAdapter<T extends RenderObject> extends RenderObjectWidget {
   /// Creates a bridge from a [RenderObject] to an [Element] tree.
   ///
   /// Used by [WidgetsBinding] to attach the root widget to the [RenderView].
   RenderObjectToWidgetAdapter({
-    this.child,
-    required this.container,
+    this.child,//rootWidget
+    required this.container,//RenderView get renderView => _pipelineOwner.rootNode! as RenderView;
     this.debugShortDescription,
   }) : super(key: GlobalObjectKey(container));
 
   /// The widget below this widget in the tree.
   ///
   /// {@macro flutter.widgets.ProxyWidget.child}
+  /// 我们编写dart的runApp函数参数中传递的Flutter应用Widget树根
   final Widget? child;
 
   /// The [RenderObject] that is the parent of the [Element] created by this widget.
+  /// 继承自RenderObject，来自PipelineOwner对象的rootNode属性，一个Flutter App全局只有一个PipelineOwner实例。
   final RenderObjectWithChildMixin<T> container;
 
   /// A short description of this widget used by debugging aids.
   final String? debugShortDescription;
 
+  ///5、重写Widget的createElement实现，构建了一个RenderObjectToWidgetElement实例，它继承于Element。
+  /// Element树的根结点是RenderObjectToWidgetElement。
   @override
   RenderObjectToWidgetElement<T> createElement() => RenderObjectToWidgetElement<T>(this);
-
+  //6、重写Widget的createRenderObject实现，container本质是一个RenderView。
+  //RenderObject树的根结点是RenderView。
   @override
   RenderObjectWithChildMixin<T> createRenderObject(BuildContext context) => container;
 
@@ -1145,19 +1172,33 @@ class RenderObjectToWidgetAdapter<T extends RenderObject> extends RenderObjectWi
   /// the given element will have an update scheduled to switch to this widget.
   ///
   /// Used by [runApp] to bootstrap applications.
+  ///
+  //  7、上面代码片段中RenderObjectToWidgetAdapter实例创建后调用
+  //  owner来自 WidgetsBinding 初始化时实例化的 BuildOwner 实例，element 值就是自己。
+  //  该方法创建根Element(RenderObjectToWidgetElement)，并将Element与Widget进行关联，即创建 WidgetTree 对应的 ElementTree 。
+  //  如果Element已经创建过则将根Element中关联的Widget设为新的(即_newWidget)。
+  //  可以看见Element只会创建一次，后面都是直接复用的。
   RenderObjectToWidgetElement<T> attachToRenderTree(BuildOwner owner, [ RenderObjectToWidgetElement<T>? element ]) {
+    //最初的 element 是 null
+    //返回的 RenderObjectToWidgetElement 才是 element 树的根节点
     if (element == null) {
+      //在lockState里面代码执行过程中禁止调用setState方法
       owner.lockState(() {
-        element = createElement();
+        //创建一个Element实例，即调用本段代码片段中步骤5的方法。
+        //调用RenderObjectToWidgetAdapter的createElement方法构建了一个RenderObjectToWidgetElement实例，继承RootRenderObjectElement，又继续继承RenderObjectElement，接着继承Element。
+        element = createElement();//创建了Element的根节点
         assert(element != null);
+        //11、给根Element的owner属性赋值为WidgetsBinding初始化时实例化的BuildOwner实例。
         element!.assignOwner(owner);
       });
       owner.buildScope(element!, () {
-        element!.mount(null, null);
+        //12、重点！mount里面RenderObject
+        element!.mount(null, null);//在挂载的时候创建了renderObject 的根节点
       });
     } else {
+      //13、更新widget树时_newWidget赋值为新的，然后element数根标记为markNeedsBuild
       element._newWidget = this;
-      element.markNeedsBuild();
+      element.markNeedsBuild();//====>>接下来的这部分和 setState 的源码逻辑一致
     }
     return element!;
   }
@@ -1281,13 +1322,15 @@ class RenderObjectToWidgetElement<T extends RenderObject> extends RenderObjectEl
 /// implements the same interfaces, must be used. The following
 /// mixins are used to implement this binding:
 ///
-/// * [GestureBinding], which implements the basics of hit testing.
-/// * [SchedulerBinding], which introduces the concepts of frames.
-/// * [ServicesBinding], which provides access to the plugin subsystem.
-/// * [PaintingBinding], which enables decoding images.
-/// * [SemanticsBinding], which supports accessibility.
-/// * [RendererBinding], which handles the render tree.
-/// * [WidgetsBinding], which handles the widget tree.
+/// * [GestureBinding], which implements the basics of hit testing.[Flutter 手势事件绑定，处理屏幕事件分发及事件回调处理]
+/// * [SchedulerBinding], which introduces the concepts of frames.[Flutter 绘制调度器相关绑定类，debug 编译模式时统计绘制流程时长等操作。]
+/// * [ServicesBinding], which provides access to the plugin subsystem.[Flutter 系统平台消息监听绑定类。即 Platform 与 Flutter 层通信相关服务，同时注册监听了应用的生命周期回调。]
+/// * [PaintingBinding], which enables decoding images.[Flutter 绘制预热缓存等绑定类。]
+/// * [SemanticsBinding], which supports accessibility.[语义树和 Flutter 引擎之间的粘合剂绑定类。]
+/// * [RendererBinding], which handles the render tree.[渲染树和 Flutter 引擎之间的粘合剂绑定类，内部重点是持有了渲染树的根节点。]
+/// * [WidgetsBinding], which handles the widget tree.[Widget 树和 Flutter 引擎之间的粘合剂绑定类。]
+/// WidgetsFlutterBinding 实例及初始化: 继承自 BindingBase with了N多个 xxxBinding,在 BindingBase 的构造器进行 initInstances，同时 各个
+/// xxxBinding 一并执行了 initInstances
 class WidgetsFlutterBinding extends BindingBase with GestureBinding, SchedulerBinding, ServicesBinding, PaintingBinding, SemanticsBinding, RendererBinding, WidgetsBinding {
   /// Returns an instance of the binding that implements
   /// [WidgetsBinding]. If no binding has yet been initialized, the
@@ -1301,8 +1344,11 @@ class WidgetsFlutterBinding extends BindingBase with GestureBinding, SchedulerBi
   /// binding instance to a [TestWidgetsFlutterBinding], not a
   /// [WidgetsFlutterBinding]. See
   /// [TestWidgetsFlutterBinding.ensureInitialized].
+  /// WidgetsFlutterBinding 就是将 Widget 架构和 Flutter Engine 连接的核心桥梁，也是整个 Flutter 的应用层核心。
+  /// 通过 ensureInitialized() 方法我们可以得到一个  全局  单例  的 WidgetsFlutterBinding 实例，且 mixin 的一堆 XxxBinding 也被实例化。
   static WidgetsBinding ensureInitialized() {
     if (WidgetsBinding._instance == null) {
+      //构造器执行
       WidgetsFlutterBinding();
     }
     return WidgetsBinding.instance;

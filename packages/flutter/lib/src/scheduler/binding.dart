@@ -945,6 +945,7 @@ mixin SchedulerBinding on BindingBase {
       // to the new time in the "real" frame. The biggest problem with this is
       // that implicit animations end up being triggered at the old time and
       // then skipping every frame and finishing in the new time.
+      //重置时间戳，避免热重载情况从热身帧到热重载帧的时间差，导致隐式动画的跳帧情况。
       resetEpoch();
       _warmUpFrame = false;
       if (hadScheduledFrame) {
@@ -954,6 +955,8 @@ mixin SchedulerBinding on BindingBase {
 
     // Lock events so touch events etc don't insert themselves until the
     // scheduled frame has finished.
+    //在此次绘制结束前该方法会锁定事件分发，可保证绘制过程中不会再触发新重绘。
+    //也就是说在本次绘制结束前不会响应各种事件。
     lockEvents(() async {
       await endOfFrame;
       timelineTask.finish();

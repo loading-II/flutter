@@ -29,15 +29,18 @@ mixin RendererBinding on BindingBase, ServicesBinding, SchedulerBinding, Gesture
   void initInstances() {
     super.initInstances();
     _instance = this;
+    //创建管理rendering渲染管道的类,提供接口调用用来触发渲染。
     _pipelineOwner = PipelineOwner(
       onSemanticsOwnerCreated: _handleSemanticsOwnerCreated,
       onSemanticsUpdate: _handleSemanticsUpdate,
       onSemanticsOwnerDisposed: _handleSemanticsOwnerDisposed,
     );
+    //一堆window变化相关的回调监听
     platformDispatcher
       ..onMetricsChanged = handleMetricsChanged
       ..onTextScaleFactorChanged = handleTextScaleFactorChanged
       ..onPlatformBrightnessChanged = handlePlatformBrightnessChanged;
+    //创建RenderView对象，也就是RenderObject渲染树的根节点
     initRenderView();
     addPersistentFrameCallback(_handlePersistentFrameCallback);
     initMouseTracker();
@@ -212,6 +215,7 @@ mixin RendererBinding on BindingBase, ServicesBinding, SchedulerBinding, Gesture
       _debugIsRenderViewInitialized = true;
       return true;
     }());
+    //渲染树的根节点对象
     renderView = RenderView(configuration: createViewConfiguration(), view: platformDispatcher.implicitView!);
     renderView.prepareInitialFrame();
   }
@@ -224,6 +228,7 @@ mixin RendererBinding on BindingBase, ServicesBinding, SchedulerBinding, Gesture
 
   /// The render tree's owner, which maintains dirty state for layout,
   /// composite, paint, and accessibility semantics.
+  /// 定义renderView的get方法，获取自_pipelineOwner.rootNode
   PipelineOwner get pipelineOwner => _pipelineOwner;
   late PipelineOwner _pipelineOwner;
 
