@@ -1331,7 +1331,9 @@ class RenderObjectToWidgetElement<T extends RenderObject> extends RenderObjectEl
 /// * [WidgetsBinding], which handles the widget tree.[Widget 树和 Flutter 引擎之间的粘合剂绑定类。]
 /// WidgetsFlutterBinding 实例及初始化: 继承自 BindingBase with了N多个 xxxBinding,在 BindingBase 的构造器进行 initInstances，同时 各个
 /// xxxBinding 一并执行了 initInstances
-class WidgetsFlutterBinding extends BindingBase with GestureBinding, SchedulerBinding, ServicesBinding, PaintingBinding, SemanticsBinding, RendererBinding, WidgetsBinding {
+class WidgetsFlutterBinding extends BindingBase with
+    GestureBinding, SchedulerBinding, ServicesBinding,
+    PaintingBinding, SemanticsBinding, RendererBinding, WidgetsBinding {
   /// Returns an instance of the binding that implements
   /// [WidgetsBinding]. If no binding has yet been initialized, the
   /// [WidgetsFlutterBinding] class is used to create and initialize

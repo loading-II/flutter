@@ -2509,6 +2509,11 @@ abstract class BuildContext {
 ///
 /// ** See code in examples/api/lib/widgets/framework/build_owner.0.dart **
 /// {@end-tool}
+/// BuildOwner是element的管理类，主要负责 dirtyElement、inactiveElement、globalkey关联的element的管理。
+/// 管理 dirtyElement: final List<Element> _dirtyElements = <Element>[]; 列表进行管理
+/// 管理 inactiveElement： final _InactiveElements _inactiveElements = _InactiveElements(); 对象进行管理
+/// 管理 globalkey关联的element：final Map<GlobalKey, Element> _globalKeyRegistry = <GlobalKey, Element>{}; Map进行管理
+/// 关于 BuildOwner将的比较好的文章：https://www.helloworld.net/p/4429506634
 class BuildOwner {
   /// Creates an object that manages widgets.
   ///
@@ -2524,8 +2529,11 @@ class BuildOwner {
   /// dirty.
   VoidCallback? onBuildScheduled;
 
+  /// InActiveElements
   final _InactiveElements _inactiveElements = _InactiveElements();
 
+  /// 脏数据列表--List
+  /// 收集 dirtyElement: setState的流程 markNeedBuild 函数
   final List<Element> _dirtyElements = <Element>[];
   bool _scheduledFlushDirtyElements = false;
 
