@@ -273,6 +273,7 @@ class GlobalObjectKey<T extends State<StatefulWidget>> extends GlobalKey<T> {
 }
 
 /// Describes the configuration for an [Element].
+/// 描述Element的配置信息
 ///
 /// Widgets are the central class hierarchy in the Flutter framework. A widget
 /// is an immutable description of part of a user interface. Widgets can be
@@ -306,6 +307,8 @@ class GlobalObjectKey<T extends State<StatefulWidget>> extends GlobalKey<T> {
 ///    be read by descendant widgets.
 ///  * [StatelessWidget], for widgets that always build the same way given a
 ///    particular configuration and ambient state.
+///    代表 Widget 是不可变的，这会限制 Widget 中定义的属性（即配置信息）必须是不可变的（final）
+///    widget类继承自DiagnosticableTree，DiagnosticableTree即“诊断树”，主要作用是提供调试信息。
 @immutable
 abstract class Widget extends DiagnosticableTree {
   /// Initializes [key] for subclasses.
@@ -333,6 +336,7 @@ abstract class Widget extends DiagnosticableTree {
   /// See also:
   ///
   ///  * The discussions at [Key] and [GlobalKey].
+  ///  这个key属性类似于 React/Vue 中的key，主要的作用是决定是否在下一次build时复用旧的 widget ，决定的条件在canUpdate()方法中。
   final Key? key;
 
   /// Inflates this configuration to a concrete instance.
@@ -342,6 +346,7 @@ abstract class Widget extends DiagnosticableTree {
   /// is placed in the tree, it is inflated into an [Element], which means a
   /// widget that is incorporated into the tree multiple times will be inflated
   /// multiple times.
+  /// Flutter 框架在构建UI树时，会先调用此方法生成对应节点的Element对象。此方法是 Flutter 框架隐式调用的，在我们开发过程中基本不会调用到。
   @protected
   @factory
   Element createElement();
@@ -352,7 +357,7 @@ abstract class Widget extends DiagnosticableTree {
     final String type = objectRuntimeType(this, 'Widget');
     return key == null ? type : '$type-$key';
   }
-
+  ///复写父类的方法，主要是设置诊断树的一些特性。
   @override
   void debugFillProperties(DiagnosticPropertiesBuilder properties) {
     super.debugFillProperties(properties);
@@ -377,6 +382,9 @@ abstract class Widget extends DiagnosticableTree {
   /// If the widgets have no key (their key is null), then they are considered a
   /// match if they have the same type, even if their children are completely
   /// different.
+  /// 字面意思是是否更新，实际意思：是否用新的widget更新旧Widget对应生成的Element 的配置
+  /// 如果true既不需要新建Element，如果为false则需要新建Element
+  /// 判断条件是： runtimeType  和  key 是否同时相同
   static bool canUpdate(Widget oldWidget, Widget newWidget) {
     return oldWidget.runtimeType == newWidget.runtimeType
         && oldWidget.key == newWidget.key;
