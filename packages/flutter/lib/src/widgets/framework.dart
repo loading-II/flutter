@@ -930,6 +930,7 @@ abstract class State<T extends StatefulWidget> with Diagnosticable {
   /// configuration, the framework will update this property to refer to the new
   /// widget and then call [didUpdateWidget], passing the old configuration as
   /// an argument.
+  /// State 源码中，是存在 _widget 的属性的，那么赋值实在 StatefulWidget 对应的 Element 中进行的
   T get widget => _widget!;
   T? _widget;
 
@@ -3277,6 +3278,7 @@ abstract class Element extends DiagnosticableTree implements BuildContext {
   /// Creates an element that uses the given widget as its configuration.
   ///
   /// Typically called by an override of [Widget.createElement].
+  /// element 构造器持有Widget，这里的widget可以是StatelessWidget 也可以是 StatefulWidget
   Element(Widget widget)
     : _widget = widget {
     if (kFlutterMemoryAllocationsEnabled) {
@@ -5182,8 +5184,12 @@ class StatelessElement extends ComponentElement {
 /// An [Element] that uses a [StatefulWidget] as its configuration.
 class StatefulElement extends ComponentElement {
   /// Creates an element that uses the given widget as its configuration.
+  /// 最终继承自 Element, 且Element的构造器持有Widget，这里的widget可以是StatelessWidget 也可以是 StatefulWidget
+  /// 源码中可见 _state = widget.createState(),同时又持有了 StatefulWidget 对应的 State
+  /// StatefulWidget  对应的 state  和 Element 之间是互相持有的状态
+  /// 在这里一并看下StatefulWidget的生命周期
   StatefulElement(StatefulWidget widget)
-      : _state = widget.createState(),
+      : _state = widget.createState(),///①createState
         super(widget) {
     assert(() {
       if (!state._debugTypesAreRight(widget)) {
@@ -5199,19 +5205,20 @@ class StatefulElement extends ComponentElement {
       return true;
     }());
     assert(state._element == null);
-    state._element = this;
+    state._element = this; ///state 持有 element
     assert(
       state._widget == null,
       'The createState function for $widget returned an old or invalid state '
       'instance: ${state._widget}, which is not null, violating the contract '
       'for createState.',
     );
-    state._widget = widget;
+    state._widget = widget; ///state 持有 widget
     assert(state._debugLifecycleState == _StateLifecycle.created);
   }
 
   @override
-  Widget build() => state.build(this);
+  Widget build() => state.build(this);//④执行Build函数
+  ///OK，源码中显示element 的Build 函数所对应的就是 state.build(this),且 把 this 传参，所以 State中的BuildContext 等同于 Element
 
   /// The [State] instance associated with this location in the tree.
   ///
@@ -5229,10 +5236,11 @@ class StatefulElement extends ComponentElement {
     super.reassemble();
   }
 
+  ///StatefulWidget 继承自 ComponentWidget，在ComponentWidget 进行挂载到Element树的时候，会调用首次build 然后执行Widget的生命周期
   @override
   void _firstBuild() {
     assert(state._debugLifecycleState == _StateLifecycle.created);
-    final Object? debugCheckForReturnedFuture = state.initState() as dynamic;
+    final Object? debugCheckForReturnedFuture = state.initState() as dynamic;///第一次Build时会进行生命周期中②state.initState
     assert(() {
       if (debugCheckForReturnedFuture is Future) {
         throw FlutterError.fromParts(<DiagnosticsNode>[
@@ -5250,21 +5258,21 @@ class StatefulElement extends ComponentElement {
       state._debugLifecycleState = _StateLifecycle.initialized;
       return true;
     }());
-    state.didChangeDependencies();
+    state.didChangeDependencies();//③didChangeDependencies：具体讲是指所依赖的发生变化，此时会响应 didChangeDepencies
     assert(() {
       state._debugLifecycleState = _StateLifecycle.ready;
       return true;
     }());
-    super._firstBuild();
+    super._firstBuild();//调用父类--执行rebuild--performRebuild
   }
 
   @override
   void performRebuild() {
-    if (_didChangeDependencies) {
+    if (_didChangeDependencies) {//这里印证了依赖发生变化后，会进行调用生命周期中的 didChangeDependencies
       state.didChangeDependencies();
       _didChangeDependencies = false;
     }
-    super.performRebuild();
+    super.performRebuild();//父类中去执行Build函数
   }
 
   @override
@@ -5951,6 +5959,7 @@ abstract class RenderObjectElement extends Element {
     // 返回的是RenderObjectToWidgetAdapter的container成员，也就是上面分析的RenderView渲染树根节点。
     // 所以说：element 会有widget 和 renderObject，
     // 在这里创建了 renderObject的根节点 RenderObject
+    // ①Element对应的widget的createRenderObject方法创建和Element相关联的RenderObject
     _renderObject = (widget as RenderObjectWidget).createRenderObject(this);
     assert(!_renderObject!.debugDisposed!);
     assert(() {
@@ -5962,6 +5971,7 @@ abstract class RenderObjectElement extends Element {
       return true;
     }());
     assert(_slot == newSlot);
+    ///②然后通过attachRenderObject将RenderObject插入到渲染树种指定的插槽位置
     attachRenderObject(newSlot);
     super.performRebuild(); // clears the "dirty" flag
   }
@@ -6287,7 +6297,7 @@ abstract class RenderObjectElement extends Element {
     assert(_ancestorRenderObjectElement == null);
     _slot = newSlot;
     _ancestorRenderObjectElement = _findAncestorRenderObjectElement();
-    _ancestorRenderObjectElement?.insertRenderObjectChild(renderObject, newSlot);
+    _ancestorRenderObjectElement?.insertRenderObjectChild(renderObject, newSlot);///③插入指定的渲染树的插槽位置，此时的Element处于active状态
     final ParentDataElement<ParentData>? parentDataElement = _findAncestorParentDataElement();
     if (parentDataElement != null) {
       _updateParentData(parentDataElement.widget as ParentDataWidget<ParentData>);
